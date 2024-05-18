@@ -1,8 +1,11 @@
-from pickle import FALSE, TRUE
+from imghdr import what
 import requests
 from bs4 import BeautifulSoup
+import psycopg2
 import os
 import sys
+import psycopg2.errors as pg2errors
+
 
 #scraping logic
 
@@ -40,7 +43,7 @@ def main_pages_pars(main_url, number):
     print(next_url)
     # print(number)
     number += 1
-    if (number <= 50):
+    if (number <= 5):
         main_pages_pars(next_url, number)
         
     
@@ -62,7 +65,7 @@ def articles_data(rel_url):
         print(title.get('content'))
     date = soup.find('span', class_ = 'tm-article-datetime-published').time
     if (date is not None):
-        data.update({'publication_date': date.get('datetime')})
+        data.update({'publication_date': date.get('title')})
 #auth_inform
     auth = soup.find('a', class_ = 'tm-user-info__username') #may be None
 
@@ -79,32 +82,67 @@ def articles_data(rel_url):
 
     #text of article 
 
-    # text = soup.find('div', class_ = 'tm-article-body').text
-    # data.update({'content':text})
+    text = soup.find('div', class_ = 'tm-article-body').text
+    data.update({'content':text})
+
+
+    #тэги
+    tags = soup.find_all('meta')
+    
+    for i in tags:
+        if (i.get('name') == 'keywords') :
+            print(i.get('content'))
+            data.update({'tags':i.get('content')})
+
     return data
 
 
-#main_pages_pars('https://habr.com/ru/articles/page17/')
+def save_data(data) :
+    try:
+    # пытаемся подключиться к базе данных
+        conn = psycopg2.connect(dbname='test', user='pi', password='12345', host='localhost', port='5432')
+    except:
+    # в случае сбоя подключения будет выведено сообщение в STDOUT
+        print('Can`t establish connection to database')
+        conn.close()
+    try:
+        title = ''    
+        if (data.get('art_name') is not None):
+            title =  data.get('art_name')
+        tag_mas = data.get('tags').split(',')
+        tag_text = ''
+        for i in tag_mas:
+            tag_text += '$$'
+            tag_text += i
+            tag_text += '$$'
+            tag_text += ','
+        tag_text = tag_text[:-1]         
+        add_article_query = "INSERT INTO Articles VALUES("+ data.get('art_id') + ', $$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "]);"
+        print(add_article_query)
+        cur = conn.cursor()
+        cur.execute(add_article_query)
+        conn.commit()
+        cur.close()
+        # with conn.cursor as curs:
+        #     curs.execute(add_article_query)
+        #     conn.commit()
+        conn.close()
+
+    except psycopg2.OperationalError as _ex:
+        print('ну что-то не так пошло, закроем подключение')
+        conn.close()    
+
+
+
 #main
-try :
-     page = requests.get('https://habr.com/ru/articles/page17/')
-     soup = BeautifulSoup(page.text, 'html.parser')
-except requests.exceptions.InvalidSchema:
-    print('исправь пж ссылку как-то')#сработает только на первую часть ссылки
-    sys.exit(1)
- #поиск ссылок на главной странице
-test = soup.find('a', class_ = 'tm-pagination__page')#беру первый элмент тк дальше под тем  же классом ссылка на 49, 50 страницу
-print(test.get('href'))
-main_page = []
-main_page = soup.find_all('a', class_ = 'tm-title__link')
-all_text, all_link = [], []
-for data in main_page:
-    if data.find('span') is not None:
-        all_text.append(data.text)
-        all_link.append(data.get('href'))
-for i in all_link:
-         print(i)
-         art = articles_data(i)
+#main_pages_pars('https://habr.com/ru/', 1)
+
+
+data = articles_data('/ru/companies/testograf/articles/815249/')
+
+save_data(data)
+
+
 
 
 
