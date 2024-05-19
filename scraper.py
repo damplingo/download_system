@@ -67,7 +67,8 @@ def articles_data(rel_url):
         print(title.get('content'))
     date = soup.find('span', class_ = 'tm-article-datetime-published').time
     if (date is not None):
-        data.update({'publication_date': date.get('title')})
+        print(date.get('datetime'))
+        data.update({'publication_date': date.get('datetime')})
 #auth_inform
     auth = soup.find('a', class_ = 'tm-user-info__username') #may be None
 
@@ -85,12 +86,12 @@ def articles_data(rel_url):
     #text of article 
 
     text = soup.find('div', class_ = 'tm-article-body').text
-    new_text = ''
-    text = text.split('.')
-    for i in text:
-        new_text += i
-        new_text += "\n"
-    data.update({'content':new_text})
+    # new_text = ''
+    # text = text.split('.')
+    # for i in text:
+    #     new_text += i
+    #     new_text += ".\n"
+    data.update({'content':text})
 
 
     #тэги
@@ -227,7 +228,6 @@ def exist_author(cur, auth_name):
 
 #main
 main_pages_pars('https://habr.com/ru/', 1)
-
 #data = articles_data('/ru/companies/otus/articles/814041/')
 
 #save_data(data)
