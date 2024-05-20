@@ -229,7 +229,8 @@ def exist_author(cur, auth_name):
 #main
 main_pages_pars('https://habr.com/ru/', 1)
 #data = articles_data('/ru/companies/otus/articles/814041/')
-
+# res = requests.get('http://127.0.0.1:5000/articles/815383')
+# print(res.json())
 #save_data(data)
 
 
