@@ -9,20 +9,20 @@ class Habr_resource(Resource):
     def get(self, id):
         try:
     # пытаемся подключиться к базе данных
-            conn = psycopg2.connect(dbname='test', user='server', password='server', host='localhost', port='5432')
+            conn = psycopg2.connect(dbname='test_3', user='server', password='server', host='localhost', port='5432')
         except:
     # в случае сбоя подключения будет выведено сообщение в STDOUT
             print('Can`t establish connection to database')
             conn.close()
         ans = {}
         cur = conn.cursor() 
-        query_find = 'SELECT COUNT (*) FROM Articles WHERE art_id = ' + str(id) + ';'    
+        query_find = 'SELECT COUNT (*) FROM Articles WHERE Art_id_hubr = ' + str(id) + ';'    
         cur.execute(query_find)
         count = cur.fetchone()[0]
         if count == 0:   
             return "no this id"
         else:
-            query = 'SELECT Articles.art_id, title, publication_date, content, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.art_id Join Authors ON Auth_art_id.auth_id = Authors.auth_id;'
+            query = 'SELECT Art_id_hubr, title, publication_date, content, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.id Join Authors ON Auth_art_id.auth_id = Authors.auth_id;'
             cur.execute(query)
             q_m = cur.fetchone()
             ans.update({'art_id': q_m[0]})
@@ -38,12 +38,12 @@ class dates_resource(Resource):
     def get(self, date_after, date_before, max_lim):
         try:
     # пытаемся подключиться к базе данных
-            conn = psycopg2.connect(dbname='test', user='server', password='server', host='localhost', port='5432')
+            conn = psycopg2.connect(dbname='test_3', user='server', password='server', host='localhost', port='5432')
         except:
     # в случае сбоя подключения будет выведено сообщение в STDOUT
             print('Can`t establish connection to database')
             conn.close()
-        query = 'SELECT Articles.art_id, title, publication_date, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.art_id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE (Articles.publication_date > '+ '$$'+date_after+'$$'+'AND  Articles.publication_date <' + '$$'+date_before +'$$) ' +'LIMIT '+ str(max_lim)+';'
+        query = 'SELECT Art_id_hubr, title, publication_date, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE (Articles.publication_date > '+ '$$'+date_after+'$$'+'AND  Articles.publication_date <' + '$$'+date_before +'$$) ' +'LIMIT '+ str(max_lim)+';'
              
         cur = conn.cursor()
         cur.execute(query)
@@ -68,12 +68,12 @@ class one_date_resource(Resource):
     def get(self, date, max_lim):
         try:
 # пытаемся подключиться к базе данных
-            conn = psycopg2.connect(dbname='test', user='server', password='server', host='localhost', port='5432')
+            conn = psycopg2.connect(dbname='test_3', user='server', password='server', host='localhost', port='5432')
         except:
 # в случае сбоя подключения будет выведено сообщение в STDOUT
             print('Can`t establish connection to database')
             conn.close()
-        query =   'SELECT Articles.art_id, title, publication_date, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.art_id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE (date(Articles.publication_date) = '+ 'date($$'+date+'$$)'+')' +'LIMIT '+ str(max_lim)+';'
+        query =   'SELECT Art_id_hubr, title, publication_date, tags, name FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE (date(Articles.publication_date) = '+ 'date($$'+date+'$$)'+')' +'LIMIT '+ str(max_lim)+';'
         cur = conn.cursor()
         cur.execute(query)
         q_m = cur.fetchall()
@@ -99,20 +99,22 @@ class authors_resource(Resource):
             author_name= author_name + ' '
         try:
 # пытаемся подключиться к базе данных
-            conn = psycopg2.connect(dbname='test', user='server', password='server', host='localhost', port='5432')
+            conn = psycopg2.connect(dbname='test_3', user='server', password='server', host='localhost', port='5432')
         except:
 # в случае сбоя подключения будет выведено сообщение в STDOUT
             print('Can`t establish connection to database')
             conn.close()   
         cur = conn.cursor()    
         query_a = 'SELECT auth_id, name, registration_date FROM Authors WHERE name = '+'$$'+author_name+'$$;'
+        print(query_a)
         res = {}
         cur.execute(query_a)
         qf_m = cur.fetchone()
         res.update({'auth_id':qf_m[0]})
         res.update({'name':qf_m[1]})
         res.update({'registration_date':str(qf_m[2])})
-        query = 'SELECT Articles.art_id, title, publication_date, tags FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.art_id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE Authors.name = '+'$$'+author_name+'$$' ';'
+        query = 'SELECT Art_id_hubr, title, publication_date, tags FROM Articles JOIN Auth_art_id ON Auth_art_id.art_id = articles.id Join Authors ON Auth_art_id.auth_id = Authors.auth_id WHERE Authors.name = '+'$$'+author_name+'$$' ';'
+        print(query)
         list = []
         cur.execute(query)
         q_m = cur.fetchall()

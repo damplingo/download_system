@@ -45,7 +45,7 @@ def main_pages_pars(main_url, number):
     print(next_url)
     # print(number)
     number += 1
-    if (number <= 5):
+    if (number <= 2):
         main_pages_pars(next_url, number)
         
     
@@ -107,7 +107,7 @@ def articles_data(rel_url):
 def save_data(data) :
     try:
     # пытаемся подключиться к базе данных
-        conn = psycopg2.connect(dbname='test', user='pi', password='12345', host='localhost', port='5432')
+        conn = psycopg2.connect(dbname='test_3', user='pli', password='12345', host='localhost', port='5432')
     except:
     # в случае сбоя подключения будет выведено сообщение в STDOUT
         print('Can`t establish connection to database')
@@ -121,7 +121,7 @@ def save_data(data) :
         tag_mas = data.get('tags').split(',')
         tag_text = ''
         auth_name = data.get('auth_name')
-        art_id = data.get('art_id')
+        art_id = data.get('art_id')#это индексация хабра
         hash_object = hashlib.md5(data.get('content').encode())
         hash = hash_object.hexdigest()
         for i in tag_mas:
@@ -129,10 +129,21 @@ def save_data(data) :
             tag_text += i
             tag_text += '$$'
             tag_text += ','
-        tag_text = tag_text[:-1]        
-        add_article_query = "INSERT INTO Articles VALUES("+ art_id + ', $$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "]);"
-        update_article_query = 'UPDATE Articles SET (Title, publication_date, content, tags) ='+'($$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "])" + "WHERE art_id="+art_id+";"
+        tag_text = tag_text[:-1]     
+        add_art_id_query = "SELECT MAX(ID) FROM Articles;"
         cur = conn.cursor()
+        cur.execute(add_art_id_query)
+
+        add_art_id = cur.fetchone()[0]
+        if (add_art_id == None):
+            add_art_id= 0
+        add_art_id += 1 #этот id будет при вставке
+        print(add_art_id)    
+        #add_article_query = "INSERT INTO Articles VALUES("+ art_id + ', $$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "]);"
+        add_article_query = "INSERT INTO Articles(ID, Art_id_hubr, Title, publication_date, content, tags) VALUES("+str(add_art_id) + ','+ art_id + ', $$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "]);"
+        #update_article_query = 'UPDATE Articles SET (Title, publication_date, content, tags) ='+'($$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "])" + "WHERE art_id="+art_id+";"
+        update_article_query = 'UPDATE Articles SET (Title, publication_date, content, tags) ='+'($$'+title + '$$, $$' + data.get('publication_date') + '$$, $$'+data.get('content') + '$$ ,' + 'ARRAY['+ tag_text + "])" + "WHERE art_id_hubr="+art_id+";"
+            
         insert_queries.append(add_article_query)
         update_queries.append(update_article_query)
         
@@ -147,24 +158,31 @@ def save_data(data) :
                 cur.execute(add_auth_query)
                 auth_id = cur.fetchone()[0]
                 
-                add_auth_art_id_query = "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(art_id) + ',' + str(auth_id) +','+ '$$'+hash +'$$' +');'
+                #add_auth_art_id_query = "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(art_id) + ',' + str(auth_id) +','+ '$$'+hash +'$$' +');'
+                add_auth_art_id_query = "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(add_art_id) + ',' + str(auth_id) +','+ '$$'+hash +'$$' +');'
                 insert_queries.append(add_auth_art_id_query)
-
+            else :
+                find_auth = 'SELECT auth_id FROM Authors WHERE name = $$' + str(auth_name) + '$$;'
+                cur.execute(find_auth)
+                ex_auth = cur.fetchone()[0]
+                add_auth_art_id_query = "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(add_art_id) + ',' + str(ex_auth) +','+ '$$'+hash +'$$' +');'
+                insert_queries.append(add_auth_art_id_query)
 
         elif data.get('auth_name') is None:
             auth_id = -1 #default author with name = 'non author' alredy exist in table Authors
-            add_auth_art_id_query =  "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(art_id) + ',' + str(auth_id) +','+ hash +');'
+            #add_auth_art_id_query =  "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(art_id) + ',' + str(auth_id) +','+ hash +');'
+            add_auth_art_id_query =  "INSERT INTO Auth_art_id(art_id, auth_id, hash) VALUES(" + str(add_art_id) + ',' + str(auth_id) +','+ hash +');'
             insert_queries.append(add_auth_art_id_query)   
            
-        
-        if is_dublicate(cur, hash, auth_name, art_id) == 1:
+        t = is_dublicate(cur, hash, auth_name, art_id)
+        if t == 1:
             print('dublicate_but_update')
             for i in update_queries:
                 #print(i)
                 cur.execute(i)
                 conn.commit()
 
-        elif is_dublicate(cur, hash, auth_name, art_id) == 0:
+        elif t == 0:
             print('not dublicate')
             for j in insert_queries:
                 #print(j)
@@ -186,9 +204,14 @@ def save_data(data) :
         conn.close()
 
 def is_dublicate(cur, hash, auth_name, art_id):
-    query_1 = 'SELECT COUNT (*) FROM Auth_art_id JOIN Authors ON Auth_art_id.auth_id =  Authors.auth_id WHERE name ='+'$$'+auth_name+'$$ AND art_id ='+str(art_id)+';'
+    #query_1 = 'SELECT COUNT (*) FROM Auth_art_id JOIN Authors ON Auth_art_id.auth_id =  Authors.auth_id WHERE name ='+'$$'+auth_name+'$$ AND art_id ='+str(art_id)+';'
+    #print(auth_name)
+    query_1 = 'SELECT COUNT (*) FROM Auth_art_id JOIN Authors ON Auth_art_id.auth_id =  Authors.auth_id JOIN Articles ON Auth_art_id.art_id = Articles.id WHERE name ='+'$$'+auth_name+'$$ AND art_id_hubr ='+str(art_id)+';'
+    print(query_1)
     cur.execute(query_1)
+    
     count_auth_art = cur.fetchone()[0]
+    print(count_auth_art)
     if (count_auth_art == 0):
         return 0#insert_strategy
     query = 'SELECT COUNT (*) FROM Auth_art_id WHERE hash = ' + '$$'+hash+'$$;'#проверка хэша
